@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CardTracker Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --accent:#0b5fff; --chip:#f3f6ff; --muted:#666; --row:#fafafa; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; color:#111; }
+    header { position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #eee; }
+    .bar { display:flex; align-items:center; gap:10px; padding:12px 16px; flex-wrap:wrap; }
+    h1 { margin:0; font-size:20px; font-weight:700; }
+    .count { color:#888; font-weight:500; margin-left:8px; }
+    .sportbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:10px; }
+    .chip { padding:6px 12px; border:1px solid #e5e5e5; border-radius:999px; cursor:pointer; background:#fff; font-size:14px; }
+    .chip.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .search { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    .search input[type="text"] { padding:8px 10px; width:340px; max-width:56vw; border:1px solid #ddd; border-radius:6px; }
+    .search button { padding:8px 12px; border:0; background:var(--accent); color:#fff; border-radius:6px; cursor:pointer; }
+    .search label { font-size:13px; color:#333; display:flex; align-items:center; gap:6px; }
+
+    table { width:100%; border-collapse:collapse; }
+    thead th { text-align:left; font-size:13px; color:#444; padding:10px 12px; border-bottom:1px solid #eee; position:sticky; top:58px; background:#fff; z-index:5; }
+    tbody td { padding:12px; border-bottom:1px solid #f1f1f1; vertical-align:top; }
+    tbody tr:nth-child(even) { background:#fff; }
+    tbody tr:nth-child(odd)  { background:#fbfbfb; }
+
+    .imgcell { width:140px; }
+    .thumb { width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #eee; background:#fff; display:block; }
+    .thumblabel { font-size:12px; color:#777; margin-top:4px; }
+    .gallery-btn { display:inline-block; margin-top:6px; padding:6px 10px; font-size:12px; border:1px solid #ddd; background:#fff; border-radius:6px; text-decoration:none; color:#333; }
+
+    .pill { font-size:12px; border:1px solid #eee; padding:4px 8px; border-radius:999px; background:#fff; color:#333; display:inline-block; }
+    .pill.warn { background:#fff6e6; border-color:#ffe0a6; }
+    .pill.good { background:#eaf7ff; border-color:#cfeaff; }
+
+    .actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .btn { padding:6px 10px; font-size:12px; border-radius:6px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+    .btn.warn { background:#fff6f6; border-color:#ffd0d0; }
+    .wrap { max-width:520px; word-break:break-word; }
+    .num { width:90px; white-space:nowrap; }
+    .sport-select { font-size:12px; padding:4px 6px; }
+    .float-top { position:fixed; right:14px; bottom:18px; z-index:9; }
+    .topbtn { padding:10px 12px; background:var(--accent); color:#fff; border-radius:999px; text-decoration:none; font-size:13px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <h1>CardTracker Dashboard</h1>
+    <span class="count">Showing {{ cards|length }} items</span>
+
+    <nav class="sportbar">
+      {% for s in sports %}
+        <a class="chip {% if s == selected_sport %}active{% endif %}"
+           href="{{ url_for('home', sport=s, q=q, include_lots='1' if request.args.get('include_lots')=='1' else '0') }}">{{ s }}</a>
+      {% endfor %}
+    </nav>
+
+    <form class="search" method="get" action="{{ url_for('home') }}">
+      <input type="hidden" name="sport" value="{{ selected_sport }}">
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="Search Player, Set, Year, Card #, Grade..." />
+      <label>
+        <input type="checkbox" name="include_lots" value="1" {% if request.args.get('include_lots')=='1' %}checked{% endif %}>
+        Include lots/boxes
+      </label>
+      <button type="submit">Search</button>
+    </form>
+  </div>
+</header>
+
+<main>
+  <table>
+    <thead>
+      <tr>
+        <th class="imgcell">Images</th>
+        <th>Player</th>
+        <th>Set</th>
+        <th class="num">Year</th>
+        <th class="num">Card #</th>
+        <th class="num">Grade</th>
+        <th class="num">ROI %</th>
+        <th class="num">Sport</th>
+        <th class="num">Rec</th>
+        <th class="num">eBay</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      {% for c in cards %}
+        {# ---- figure out display values (Player/Card# fallbacks) ---- #}
+        {% set player_raw = (c.get('Player') or '').strip() %}
+        {% set set_raw    = (c.get('Set') or '').strip() %}
+        {% set player_disp = c.get('__player_disp','').strip() %}
+        {% set card_fallback = c.get('__cardno_disp','').strip() %}
+        {% set card_real = (c.get('Card No#') or c.get('Card Number','') or '').strip() %}
+
+        {% if player_raw and set_raw and player_raw|lower == set_raw|lower %}
+          {% set player_show = player_disp %}
+        {% else %}
+          {% set player_show = player_raw or player_disp %}
+        {% endif %}
+
+        {% set cardno_show = card_real or card_fallback %}
+
+        <tr>
+          <td class="imgcell">
+            {% if c.get('__front') %}
+              {% set f = c['__front'] %}
+              {% set imgsrc = f %}
+              {% if ('http://' not in f) and ('https://' not in f) and ('data:image' not in (f|lower)) %}
+                {% set imgsrc = url_for('serve_img', p=f) %}
+              {% endif %}
+              <img class="thumb" src="{{ imgsrc }}" alt="Front">
+              <div class="thumblabel">Front</div>
+            {% elif c.get('__back') %}
+              {% set b = c['__back'] %}
+              {% set imgsrc = b %}
+              {% if ('http://' not in b) and ('https://' not in b) and ('data:image' not in (b|lower)) %}
+                {% set imgsrc = url_for('serve_img', p=b) %}
+              {% endif %}
+              <img class="thumb" src="{{ imgsrc }}" alt="Back">
+              <div class="thumblabel">Back</div>
+            {% endif %}
+
+            {% if c.get('__img_count',0) | int > 1 %}
+              <a class="gallery-btn"
+                 href="{{ url_for('card_detail',
+                                  player=c.get('Player',''),
+                                  set=c.get('Set',''),
+                                  year=c.get('Year',''),
+                                  num=c.get('Card No#', c.get('Card Number','')) ) }}">Gallery ({{ c.get('__img_count') }})</a>
+            {% elif c.get('__front') %}
+              <a class="gallery-btn"
+                 href="{{ url_for('card_detail',
+                                  player=c.get('Player',''),
+                                  set=c.get('Set',''),
+                                  year=c.get('Year',''),
+                                  num=c.get('Card No#', c.get('Card Number','')) ) }}">Open</a>
+            {% endif %}
+          </td>
+
+          <td class="wrap" title="{{ player_show }}">{{ player_show }}</td>
+          <td class="wrap" title="{{ set_raw }}">{{ set_raw }}</td>
+          <td class="num">{{ c.get('Year','') }}</td>
+          <td class="num">{{ cardno_show }}</td>
+          <td class="num">{{ c.get('Grade', c.get('grade','')) }}</td>
+          <td class="num">{% if c.get('roi_pct') %}{{ c['roi_pct'] }}{% endif %}</td>
+          <td class="num"><span class="pill">{{ c.get('Sport','') or 'Other' }}</span></td>
+
+          <td class="num">
+            {% set rec = (c.get('__rec') or '').upper() %}
+            {% if rec == 'GRADE' %}
+              <span class="pill good">Grade</span>
+            {% elif rec == 'RESCAN' %}
+              <span class="pill warn">Rescan</span>
+            {% else %}
+              <span class="pill">Raw</span>
+            {% endif %}
+          </td>
+
+          <td class="num">
+            {% if c.get('ebay_url') %}
+              <a href="{{ c['ebay_url'] }}" target="_blank" rel="noopener">Link</a>
+            {% endif %}
+          </td>
+
+          <td class="actions">
+            <form method="post" action="{{ url_for('rescan') }}" style="display:inline;">
+              <input type="hidden" name="Player" value="{{ c.get('Player','') }}">
+              <input type="hidden" name="Set" value="{{ c.get('Set','') }}">
+              <input type="hidden" name="Year" value="{{ c.get('Year','') }}">
+              <input type="hidden" name="Card Number" value="{{ c.get('Card No#', c.get('Card Number','')) }}">
+              <input type="hidden" name="reason" value="user_rescan">
+              <button class="btn" type="submit">Rescan</button>
+            </form>
+
+            <form method="post" action="{{ url_for('delete') }}" style="display:inline;">
+              <input type="hidden" name="Player" value="{{ c.get('Player','') }}">
+              <input type="hidden" name="Set" value="{{ c.get('Set','') }}">
+              <input type="hidden" name="Year" value="{{ c.get('Year','') }}">
+              <input type="hidden" name="Card Number" value="{{ c.get('Card No#', c.get('Card Number','')) }}">
+              <button class="btn warn" type="submit">Hide</button>
+            </form>
+
+            <form method="post" action="{{ url_for('set_sport') }}" style="display:inline;">
+              <input type="hidden" name="Player" value="{{ c.get('Player','') }}">
+              <input type="hidden" name="Set" value="{{ c.get('Set','') }}">
+              <input type="hidden" name="Year" value="{{ c.get('Year','') }}">
+              <input type="hidden" name="Card Number" value="{{ c.get('Card No#', c.get('Card Number','')) }}">
+              <input type="hidden" name="q" value="{{ q or '' }}">
+              <input type="hidden" name="include_lots" value="{{ '1' if request.args.get('include_lots')=='1' else '0' }}">
+              <input type="hidden" name="current_sport" value="{{ selected_sport }}">
+              <select name="Sport" class="sport-select">
+                {% for s in ['Basketball','Baseball','Football','Other'] %}
+                  <option value="{{ s }}" {% if (c.get('Sport','') or '')|title == s %}selected{% endif %}>{{ s }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn" type="submit">Set sport</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</main>
+
+<a class="float-top topbtn" href="#top" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">Top</a>
+
+</body>
+</html>

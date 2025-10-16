@@ -1,0 +1,106 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CardTracker — Fixed Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='ct.dashboard.css') }}">
+</head>
+<body>
+  <main class="wrap" style="max-width:1400px;margin:24px auto;padding:0 16px;">
+    <h1 style="margin-bottom:12px;">Active Cards (Fixed Layout)</h1>
+    <p style="margin-top:0;color:#666;">Front on the left, Back on the right. Edits below. Delete controls separate for images vs whole card.</p>
+
+    {% for row in rows %}
+    <section class="card" id="card-{{ row['__id__'] }}">
+      <header style="margin-bottom:8px;font-weight:600;">
+        {{ row['__player__'] or 'Unknown Player' }} • {{ row['__set__'] or 'Set' }} • {{ row['__year__'] or 'Year' }} • #{{ row['__num__'] or '—' }}
+      </header>
+
+      <div class="image-strip">
+        <div class="image-slot">
+          <span class="slot-label">Front</span>
+          {% if row['__front__'] %}
+            <img src="/img_fs?path={{ row['__front__']|urlencode }}" alt="Front image">
+          {% else %}
+            <div class="placeholder">Front card</div>
+          {% endif %}
+        </div>
+
+        <div class="image-slot">
+          <span class="slot-label">Back</span>
+          {% if row['__back__'] %}
+            <img src="/img_fs?path={{ row['__back__']|urlencode }}" alt="Back image">
+          {% else %}
+            <div class="placeholder">Back card</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn danger" data-action="delete-front" data-id="{{ row['__id__'] }}">Delete Front</button>
+        <button class="btn danger" data-action="delete-back" data-id="{{ row['__id__'] }}">Delete Back</button>
+        <button class="btn danger" data-action="delete-card" data-id="{{ row['__id__'] }}">Delete Entire Card</button>
+      </div>
+
+      <div class="details">
+        <div><label>Player</label><input name="player" value="{{ row['__player__'] }}"></div>
+        <div><label>Set</label><input name="set" value="{{ row['__set__'] }}"></div>
+        <div><label>Year</label><input name="year" value="{{ row['__year__'] }}"></div>
+        <div><label>#</label><input name="number" value="{{ row['__num__'] }}"></div>
+        <div><label>Market Value</label><input name="market_value" value="{{ row['__mv__'] }}"></div>
+        <div><label>Grade</label><input name="grade" value="{{ row['__grade__'] }}"></div>
+        <div class="row-actions"><button class="btn save-btn" data-id="{{ row['__id__'] }}">Save</button></div>
+      </div>
+    </section>
+    {% endfor %}
+  </main>
+
+  <script>
+    async function api(url, payload) {
+      const opt = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+      if (payload) opt.body = JSON.stringify(payload);
+      const res = await fetch(url, opt);
+      if (!res.ok) throw new Error(await res.text() || res.statusText);
+      return res.json();
+    }
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if (action.startsWith('delete-')) {
+        if (!confirm('Are you sure?')) return;
+        api(`/api/card/${encodeURIComponent(id)}/${action}`)
+          .then(j => {
+            if (action === 'delete-card' && j.ok) document.getElementById('card-'+id)?.remove();
+            else location.reload();
+          })
+          .catch(err => alert('Error: ' + err.message));
+      }
+    });
+
+    document.querySelectorAll('.save-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.target.dataset.id;
+        const card = document.getElementById('card-' + id);
+        const payload = {
+          player:       card.querySelector('input[name="player"]').value,
+          set:          card.querySelector('input[name="set"]').value,
+          year:         card.querySelector('input[name="year"]').value,
+          number:       card.querySelector('input[name="number"]').value,
+          market_value: card.querySelector('input[name="market_value"]').value,
+          grade:        card.querySelector('input[name="grade"]').value
+        };
+        try {
+          const j = await api(`/api/card/${encodeURIComponent(id)}/update`, payload);
+          if (j.ok) { e.target.textContent='Saved'; setTimeout(()=>e.target.textContent='Save', 900); }
+        } catch(err) {
+          alert('Error: ' + err.message);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

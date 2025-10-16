@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ row.get('Player','') }} • {{ row.get('Set','') }} • {{ row.get('Year','') }} #{{ row.get('Card No#', row.get('Card Number','')) }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --border:#e5e5e5; --muted:#666; --bg:#fafafa; }
+    body { margin:16px; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    a.btn, button { display:inline-block; padding:8px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; font-weight:600; text-decoration:none; color:#111; }
+    button.primary { background:#0b5fff; color:#fff; border-color:#0b5fff; }
+    header { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+    h1 { font-size:20px; margin:0; }
+    .meta { color:var(--muted); }
+    .grid2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:14px; }
+    .panel { border:1px solid var(--border); border-radius:12px; padding:12px; background:#fff; }
+    .imgs { display:flex; gap:12px; align-items:flex-start; justify-content:center; }
+    .imgs img { max-width:360px; height:auto; border:1px solid var(--border); border-radius:8px; background:#fff; }
+    .gallery { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:10px; }
+    .gallery img { width:100%; height:auto; border:1px solid var(--border); border-radius:8px; }
+    .kv { display:grid; grid-template-columns: 140px 1fr; gap:6px; }
+    .kv div:nth-child(odd){ color:var(--muted); }
+    form.inline { display:inline; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a class="btn" href="{{ url_for('home') }}">← Back</a>
+    <h1>{{ row.get('Player','') }} • {{ row.get('Set','') }} • {{ row.get('Year','') }} #{{ row.get('Card No#', row.get('Card Number','')) }}</h1>
+    <span class="meta">Sport: {{ row.get('Sport','Other') }} | Grade: {{ row.get('Grade') or row.get('grade') or '' }}</span>
+    {% if row.get('ebay_url') %}
+      <a class="btn" href="{{ row.get('ebay_url') }}" target="_blank" rel="noopener">eBay Listing</a>
+    {% endif %}
+  </header>
+
+  <!-- Side-by-side front/back if available -->
+  <div class="panel">
+    <div class="imgs">
+      {% set f = row.get('__front','') %}
+      {% set b = row.get('__back','') %}
+      {% if f %}
+        {% if f.lower().startswith('http') or f.lower().startswith('data:image') %}
+          <img src="{{ f }}" alt="Front">
+        {% else %}
+          <img src="{{ url_for('serve_img', p=f) }}" alt="Front">
+        {% endif %}
+      {% endif %}
+
+      {% if b %}
+        {% if b.lower().startswith('http') or b.lower().startswith('data:image') %}
+          <img src="{{ b }}" alt="Back">
+        {% else %}
+          <img src="{{ url_for('serve_img', p=b) }}" alt="Back">
+        {% endif %}
+      {% endif %}
+      {% if not f and not b %}
+        <div class="meta">No direct front/back picked—see full gallery below.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:12px;">
+    <!-- Grading economics / recommendation -->
+    <div class="panel">
+      <h3 style="margin-top:0;">Grade vs Raw (Auto-calc)</h3>
+      <div class="kv">
+        <div>Raw value:</div><div>${{ '%.2f' % reco.get('raw_est',0.0) }}</div>
+        <div>PSA 9 est.:</div><div>${{ '%.2f' % reco.get('psa9_est',0.0) }}</div>
+        <div>Ratio (PSA9/Raw):</div><div>{{ '%.2f' % reco.get('ratio',0.0) }}×</div>
+        <div>Total cost to grade:</div><div>${{ '%.2f' % reco.get('total_cost',0.0) }}</div>
+        <div>Estimated net vs raw:</div><div>${{ '%.2f' % reco.get('net',0.0) }}</div>
+        <div>Auto recommendation:</div><div><b>{{ reco.get('rec') }}</b> (rule: ≥ {{ '%.2f' % THRESHOLD_RATIO }}× & net ≥ ${{ '%.2f' % 0 }})</div>
+      </div>
+
+      <form method="post" action="{{ url_for('save_decision') }}" style="margin-top:10px;">
+        <input type="hidden" name="Player" value="{{ row.get('Player','') }}">
+        <input type="hidden" name="Set" value="{{ row.get('Set','') }}">
+        <input type="hidden" name="Year" value="{{ row.get('Year','') }}">
+        <input type="hidden" name="Card Number" value="{{ row.get('Card No#', row.get('Card Number','')) }}">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button name="decision" value="grade" class="btn">Save: Grade</button>
+          <button name="decision" value="raw" class="btn">Save: Sell Raw</button>
+          <button name="decision" value="rescan" class="btn">Save: Rescan</button>
+        </div>
+        <div style="margin-top:8px;">
+          <input style="width:100%; padding:8px; border:1px solid var(--border); border-radius:8px;" type="text" name="note" placeholder="Optional note (surface, centering, comps, etc.)">
+        </div>
+      </form>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="panel">
+      <h3 style="margin-top:0;">Actions</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <form class="inline" method="post" action="{{ url_for('flag_bad_image') }}">
+          <input type="hidden" name="Player" value="{{ row.get('Player','') }}">
+          <input type="hidden" name="Set" value="{{ row.get('Set','') }}">
+          <input type="hidden" name="Year" value="{{ row.get('Year','') }}">
+          <input type="hidden" name="Card Number" value="{{ row.get('Card No#', row.get('Card Number','')) }}">
+          <input type="hidden" name="which" value="front">
+          <button type="submit" class="btn">Flag Bad Front → Rescan</button>
+        </form>
+
+        <form class="inline" method="post" action="{{ url_for('flag_bad_image') }}">
+          <input type="hidden" name="Player" value="{{ row.get('Player','') }}">
+          <input type="hidden" name="Set" value="{{ row.get('Set','') }}">
+          <input type="hidden" name="Year" value="{{ row.get('Year','') }}">
+          <input type="hidden" name="Card Number" value="{{ row.get('Card No#', row.get('Card Number','')) }}">
+          <input type="hidden" name="which" value="back">
+          <button type="submit" class="btn">Flag Bad Back → Rescan</button>
+        </form>
+
+        <form class="inline" method="post" action="{{ url_for('rescan') }}">
+          <input type="hidden" name="Player" value="{{ row.get('Player','') }}">
+          <input type="hidden" name="Set" value="{{ row.get('Set','') }}">
+          <input type="hidden" name="Year" value="{{ row.get('Year','') }}">
+          <input type="hidden" name="Card Number" value="{{ row.get('Card No#', row.get('Card Number','')) }}">
+          <input type="hidden" name="reason" value="user_flag">
+          <button type="submit" class="btn">Send to Rescan</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full gallery -->
+  <div class="panel" style="margin-top:12px;">
+    <h3 style="margin-top:0;">All Images ({{ images|length }})</h3>
+    <div class="gallery">
+      {% for im in images %}
+        {% if im.lower().startswith('http') or im.lower().startswith('data:image') %}
+          <a href="{{ im }}" target="_blank" rel="noopener"><img src="{{ im }}" alt="Image {{ loop.index }}"></a>
+        {% else %}
+          <a href="{{ url_for('serve_img', p=im) }}" target="_blank" rel="noopener"><img src="{{ url_for('serve_img', p=im) }}" alt="Image {{ loop.index }}"></a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+</body>
+</html>

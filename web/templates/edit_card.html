@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Card</title>
+</head>
+<body>
+    <h2>Edit Card: {{ card.player }} - #{{ card.card_number }}</h2>
+
+    <form method="POST">
+        <label for="new_price">Market Value:</label>
+        <input type="text" id="new_price" name="new_price" value="{{ card.market_value }}" required>
+
+        <label for="new_grade">Grade:</label>
+        <input type="text" id="new_grade" name="new_grade" value="{{ card.grade }}" required>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <a href="{{ url_for('index') }}">Back to Dashboard</a>
+</body>
+</html>

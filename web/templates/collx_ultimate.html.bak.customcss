@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2020 and Newer Cards</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>2020 and Newer Cards</h1>
+
+        <!-- Sport Filter Dropdown -->
+        <label for="sport-select">Select Sport:</label>
+        <select id="sport-select" onchange="window.location.href='/?sport=' + this.value">
+            <option value="Basketball" {% if sport_filter == 'Basketball' %}selected{% endif %}>Basketball</option>
+            <option value="Football" {% if sport_filter == 'Football' %}selected{% endif %}>Football</option>
+            <option value="Baseball" {% if sport_filter == 'Baseball' %}selected{% endif %}>Baseball</option>
+            <option value="Soccer" {% if sport_filter == 'Soccer' %}selected{% endif %}>Soccer</option>
+            <option value="Hockey" {% if sport_filter == 'Hockey' %}selected{% endif %}>Hockey</option>
+            <option value="All Sports" {% if sport_filter == 'All Sports' %}selected{% endif %}>All Sports</option>
+        </select>
+
+        <!-- Favorite Player Filter Dropdown -->
+        <label for="player-select">Select Player:</label>
+        <select id="player-select" onchange="window.location.href='/?player=' + this.value">
+            <option value="All" {% if player_filter == 'All' %}selected{% endif %}>All Players</option>
+            {% for player in players %}
+            <option value="{{ player }}" {% if player_filter == player %}selected{% endif %}>{{ player }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Search Box -->
+        <label for="search-box">Search Cards:</label>
+        <input type="text" id="search-box" placeholder="Search by player or card number" 
+               oninput="window.location.href='/?search=' + this.value">
+
+        <h2>Cards</h2>
+        <div class="card-grid">
+            {% for card in newer_card_data %}
+            <div class="card-item">
+                <div class="card-header">
+                    <!-- Card Number on the left -->
+                    <div class="card-number">
+                        <strong>#{{ card.card_number }}</strong>
+                    </div>
+
+                    <!-- Card Images (Front on Left, Back on Right) -->
+                    <div class="card-images">
+                        <div class="card-image">
+                            <img src="{{ card.front_image }}" alt="Card Front" width="200">
+                            {% if not card.back_image %}
+                            <div class="card-number-label">{{ card.card_number }}</div>
+                            {% endif %}
+                        </div>
+                        {% if card.back_image %}
+                        <div class="card-image">
+                            <img src="{{ card.back_image }}" alt="Card Back" width="200">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card-details">
+                    <h3>{{ card.player }} - {{ card.year }}</h3>
+                    <p><strong>Sport:</strong> {{ card.sport }}</p>
+                    <p><strong>Set:</strong> {{ card.set }}</p>
+                    <p><strong>Grade:</strong> {{ card.grade }}</p>
+                    <p><strong>Market Value:</strong> ${{ card.market_value }}</p>
+                    <p><strong>Purchase Price:</strong> ${{ card.purchase_price }}</p>
+                    <p><strong>ROI:</strong> {{ card.roi_pct }}%</p>
+
+                    <!-- Action Buttons -->
+                    <form action="{{ url_for('delete_card', card_id=card.card_number) }}" method="POST">
+                        <button type="submit">Delete Card</button>
+                    </form>
+                    <form action="{{ url_for('delete_front', card_id=card.card_number) }}" method="POST">
+                        <button type="submit">Delete Front Image</button>
+                    </form>
+                    <form action="{{ url_for('delete_back', card_id=card.card_number) }}" method="POST">
+                        <button type="submit">Delete Back Image</button>
+                    </form>
+                    <a href="{{ url_for('edit_card', card_id=card.card_number) }}">
+                        <button>Edit Card</button>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Bulk MV Update Form -->
+        <h3>Bulk Update Market Value</h3>
+        <form method="POST" action="{{ url_for('bulk_update_mvs') }}">
+            <label for="new_mv">New Market Value:</label>
+            <input type="text" id="new_mv" name="new_mv" placeholder="Enter new market value" required>
+
+            <label for="card_ids">Select Cards to Update:</label>
+            <select name="card_ids" multiple>
+                {% for card in newer_card_data %}
+                <option value="{{ card.card_number }}">{{ card.player }} - #{{ card.card_number }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">Update Market Value for Selected Cards</button>
+        </form>
+    </div>
+</body>
+</html>
+
+

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staging Page - {{ card_data.Player }}</title>
+</head>
+<body>
+    <h1>Staging: {{ card_data.Player }} (Card Number: {{ card_data.CardNumber }})</h1>
+    
+    <!-- Display card information here -->
+    <form method="POST">
+        <label for="grade">Grade:</label>
+        <input type="text" id="grade" name="grade" value="{{ card_data.Grade }}" required><br><br>
+        
+        <label for="market_value">Market Value:</label>
+        <input type="text" id="market_value" name="market_value" value="{{ card_data.MarketValue }}" required><br><br>
+
+        <!-- Add other fields as necessary -->
+
+        <input type="submit" value="Submit Changes">
+    </form>
+</body>
+</html>

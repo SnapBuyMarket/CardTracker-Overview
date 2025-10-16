@@ -1,0 +1,2 @@
+﻿# Exclude HTML templates/static from Linguist language stats
+web/** linguist-documentation

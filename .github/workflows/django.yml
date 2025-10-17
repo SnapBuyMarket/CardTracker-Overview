@@ -1,0 +1,112 @@
+name: CI (Python)
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - "**.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "setup.cfg"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-and-lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install -U pip wheel
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          # test + lint tooling (safe if already in your reqs)
+          pip install pytest pytest-cov pylint
+
+      - name: Show versions
+        run: |
+          python --version
+          pip --version
+          pytest --version
+          pylint --version
+
+      - name: Run unit tests (with coverage)
+        shell: bash
+        run: |
+          set -e
+          # Run tests; if no tests collected (exit 5), don't fail the build
+          pytest -q --maxfail=1 --disable-warnings --cov=. || code=$?
+          if [ "${code:-0}" -eq 5 ]; then
+            echo "No tests collected; continuing."
+            exit 0
+          else
+            exit "${code:-0}"
+          fi
+
+      - name: Upload coverage.xml (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            coverage.xml
+            .coverage
+          if-no-files-found: ignore
+
+      - name: Lint with pylint
+        # Let lint be advisory at first; flip to 'false' once you're ready to enforce.
+        continue-on-error: true
+
+        name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          python -m pip install -U pip build twine
+          python -m build
+      - name: Publish
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m twine upload dist/*
+
+        run: |
+          # Tweak the glob to your source dir (e.g., 'src', 'app', or package name)
+          pylint $(git ls-files '*.py')
